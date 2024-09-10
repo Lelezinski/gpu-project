@@ -1,15 +1,22 @@
 CXX = g++
-CXXFLAGS = -Wall -Werror -Wextra -pedantic -std=c++17 -g -fsanitize=address
-LDFLAGS =  -fsanitize=address
+SRC = ./src/SW.cpp
+INC = ./src/inc/
+REP = ./reports/
 
-SRC = 
-OBJ = $(SRC:.cc=.o)
-EXEC = main
+CXXFLAGS = -fsanitize=address -g -Wall -fexceptions -I$(INC)
+LDFLAGS = -fsanitize=address  
+
+OBJ = $(SRC:.cpp=.o)
+EXEC = swa
 
 all: $(EXEC)
 
 $(EXEC): $(OBJ)
-	$(CXX) $(LDFLAGS) -o $@ $(OBJ) $(LBLIBS)
+	@mkdir -p $(REP)
+	$(CXX) $(OBJ) -o $@ $(LDFLAGS)
+
+%.o: %.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 clean:
 	rm -rf $(OBJ) $(EXEC)
