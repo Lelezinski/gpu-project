@@ -1,22 +1,24 @@
 CXX = g++
-SRC = ./src/SW.cpp
-INC = ./src/inc/
-REP = ./reports/
+SRC_DIR = ./src/
+INC_DIR = ./src/inc/
+OBJ_DIR = ./obj/
+EXEC = smith_waterman
 
-CXXFLAGS = -fsanitize=address -g -Wall -fexceptions -I$(INC)
-LDFLAGS = -fsanitize=address  
+CXXFLAGS = -Wall -g -I$(INC_DIR)
 
-OBJ = $(SRC:.cpp=.o)
-EXEC = swa
+SRC = $(SRC_DIR)main.cpp $(SRC_DIR)swa.cpp $(SRC_DIR)utils.cpp
+OBJ = $(OBJ_DIR)main.o $(OBJ_DIR)swa.o $(OBJ_DIR)utils.o
 
-all: $(EXEC)
+all: $(OBJ_DIR) $(EXEC)
+
+$(OBJ_DIR):
+	mkdir -p $(OBJ_DIR)
 
 $(EXEC): $(OBJ)
-	@mkdir -p $(REP)
-	$(CXX) $(OBJ) -o $@ $(LDFLAGS)
+	$(CXX) $(CXXFLAGS) -o $(EXEC) $(OBJ)
 
-%.o: %.cpp
+$(OBJ_DIR)%.o: $(SRC_DIR)%.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(OBJ) $(EXEC)
+	rm -rf $(OBJ_DIR) $(EXEC)
