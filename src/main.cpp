@@ -1,5 +1,5 @@
-#include "inc/swa.hpp"
-#include "inc/utils.hpp"
+#include "swa.hpp"
+#include "utils.hpp"
 #include <iostream>
 #include <vector>
 
