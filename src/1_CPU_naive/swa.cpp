@@ -3,6 +3,8 @@
 // Smith-Waterman algorithm implementation
 SWAResult smithWaterman(const std::string &seqA, const std::string &seqB, int match, int mismatch, int gap_penalty)
 {
+    TimePoint start = std::chrono::high_resolution_clock::now();
+
     int rows = seqA.size() + 1;
     int cols = seqB.size() + 1;
 
@@ -49,6 +51,11 @@ SWAResult smithWaterman(const std::string &seqA, const std::string &seqB, int ma
             }
         }
     }
+
+    TimePoint end = std::chrono::high_resolution_clock::now();
+
+    std::chrono::duration<double> elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
+    std::cout << "SW Kernel executed in " << elapsed.count() << " seconds.\n";
 
     // Traceback to get the aligned sequences
     std::string alignedSeqA, alignedSeqB;

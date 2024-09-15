@@ -4,6 +4,9 @@
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <chrono>
+
+typedef std::chrono::high_resolution_clock::time_point TimePoint;
 
 struct SWAResult
 {
