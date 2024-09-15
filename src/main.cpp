@@ -54,6 +54,7 @@ int main(int argc, char *argv[])
     SWAResult bestResult;
     int bestScore = -1;
     int bestDbIndex = -1;
+    float bestScorePercentage = -1;
 
     // Compare query with each sequence in the database
     for (int i = 0; i < database.size(); ++i)
@@ -72,7 +73,9 @@ int main(int argc, char *argv[])
     // Print the best result
     if (bestScore != -1)
     {
-        std::cout << "Best alignment found with sequence #" << bestDbIndex + 1 << " in the database:\n";
+        bestScorePercentage = bestScore * 100 / (match * database[bestDbIndex].length());
+        std::cout << "Best alignment found with sequence #" << bestDbIndex + 1 << " in the database: " << bestScorePercentage << "%\n";
+
         printResult(bestResult);
     }
     else

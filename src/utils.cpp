@@ -80,8 +80,31 @@ std::vector<std::string> readDatabase(const std::string &filepath)
 void printResult(const SWAResult &result)
 {
     std::cout << "Aligned Sequences:\n";
-    std::cout << "SeqA: " << result.alignedSeqA << "\n";
-    std::cout << "SeqB: " << result.alignedSeqB << "\n";
+
+    std::string alignedSeqA = result.alignedSeqA;
+    std::string alignedSeqB = result.alignedSeqB;
+
+    // Print the sequences with color-coding
+    for (size_t i = 0; i < alignedSeqA.length(); ++i)
+    {
+        char baseA = alignedSeqA[i];
+        char baseB = alignedSeqB[i];
+
+        if (baseA == '-' || baseB == '-')
+        {
+            std::cout << YELLOW << baseA << RESET;
+        }
+        else if (baseA == baseB)
+        {
+            std::cout << GREEN << baseA << RESET;
+        }
+        else
+        {
+            std::cout << RED << baseA << RESET;
+        }
+    }
+    std::cout << "\n";
+
     std::cout << "Alignment Score: " << result.score << "\n";
 }
 
