@@ -2,7 +2,7 @@ CXX = g++
 SRC_DIR = ./src/
 INC_DIR = ./src/inc/
 OBJ_DIR = ./obj/
-EXEC = smith_waterman
+EXEC = smith_waterman.exe
 
 CXXFLAGS = -Wall -g -I$(INC_DIR)
 
