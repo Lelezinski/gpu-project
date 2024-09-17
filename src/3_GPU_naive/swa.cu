@@ -20,7 +20,7 @@ __global__ void smithWatermanKernel(int *scoreMatrix, const char *seqA, const ch
 }
 
 // Host function for Smith-Waterman algorithm
-SWAResult smithWaterman(const std::string &seqA, const std::string &seqB, int match, int mismatch, int gap_penalty)
+SWAResult smithWaterman(const std::string &seqA, const std::string &seqB, const int match, const int mismatch, const int gap_penalty)
 {
     int rows = seqA.size() + 1;
     int cols = seqB.size() + 1;
