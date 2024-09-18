@@ -16,10 +16,10 @@ int main(int argc, char *argv[])
     std::string querySeq = argv[1];
     std::string configFilePath = CONFIG_FILE;
     std::string databaseFilePath;
-    int match, mismatch, gap;
+    SWAParams params;
 
     // Parse the config file
-    if (!parseConfig(configFilePath, databaseFilePath, match, mismatch, gap))
+    if (!parseConfig(configFilePath, databaseFilePath, params.match, params.mismatch, params.gap))
     {
         std::cerr << "Failed to parse configuration file.\n";
         return 1;
@@ -55,11 +55,12 @@ int main(int argc, char *argv[])
     int bestScore = -1;
     int bestDbIndex = -1;
     float bestScorePercentage = -1;
+    int size = querySeq.size();
 
     // Compare query with each sequence in the database
     for (int i = 0; i < database.size(); ++i)
     {
-        SWAResult result = smithWaterman(querySeq, database[i], match, mismatch, gap);
+        SWAResult result = smithWaterman(querySeq, database[i], size, params);
 
         // Track the best alignment score
         if (result.score > bestScore)
@@ -73,7 +74,7 @@ int main(int argc, char *argv[])
     // Print the best result
     if (bestScore != -1)
     {
-        bestScorePercentage = bestScore * 100 / (match * database[bestDbIndex].length());
+        bestScorePercentage = bestScore * 100 / (params.match * database[bestDbIndex].length());
         std::cout << "Best alignment found with sequence #" << bestDbIndex + 1 << " in the database: " << bestScorePercentage << "%\n";
 
         printResult(bestResult);

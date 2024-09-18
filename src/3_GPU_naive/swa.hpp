@@ -1,19 +1,16 @@
 #pragma once
 
+#include <cuda_runtime.h>
 #include <iostream>
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <chrono>
+#include "utils.hpp"
 
-struct SWAResult
-{
-    std::string alignedSeqA;
-    std::string alignedSeqB;
-    int score;
-};
+typedef std::chrono::high_resolution_clock::time_point TimePoint;
 
-// Host function declaration
-SWAResult smithWaterman(const std::string &seqA, const std::string &seqB, const int match, const int mismatch, const int gap_penalty);
-__global__ void smithWatermanKernel(int *scoreMatrix, const char *seqA, const char *seqB, int rows, int cols, int match, int mismatch, int gap_penalty);
-void printScoreMatrix(const std::vector<std::vector<int>> &scoreMatrix, const std::string &seqA, const std::string &seqB);
-void printTracebackPath(const std::vector<std::vector<int>> &traceback, const std::string &seqA, const std::string &seqB);
+SWAResult smithWaterman(const std::string &seqA, const std::string &seqB, const int seqLen, SWAParams params);
+__global__ void smithWatermanKernel_P1(int *scoreMatrix, const char *seqA, const char *seqB, const int antidiagDim, const int scoreMatrixDim, const SWAParams params);
+__global__ void smithWatermanKernel_P2(int *scoreMatrix, const char *seqA, const char *seqB, const int antidiagDim, const int scoreMatrixDim, const SWAParams params);
+void printScoreMatrix(const std::vector<int> &scoreMatrix, const std::string &seqA, const std::string &seqB);

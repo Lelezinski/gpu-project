@@ -1,29 +1,28 @@
 #include "swa.hpp"
 
 // Smith-Waterman algorithm implementation
-SWAResult smithWaterman(const std::string &seqA, const std::string &seqB, int match, int mismatch, int gap_penalty)
+SWAResult smithWaterman(const std::string &seqA, const std::string &seqB, const int seqLen, SWAParams params)
 {
     TimePoint start = std::chrono::high_resolution_clock::now();
 
-    int rows = seqA.size() + 1;
-    int cols = seqB.size() + 1;
+    int scoreMatrixDim = seqLen + 1;
 
     // Score and traceback matrices
-    std::vector<std::vector<int>> scoreMatrix(rows, std::vector<int>(cols, 0));
-    std::vector<std::vector<int>> traceback(rows, std::vector<int>(cols, 0));
+    std::vector<std::vector<int>> scoreMatrix(scoreMatrixDim, std::vector<int>(scoreMatrixDim, 0));
+    std::vector<std::vector<int>> traceback(scoreMatrixDim, std::vector<int>(scoreMatrixDim, 0));
 
     int maxScore = 0;
     int maxRow = 0, maxCol = 0;
 
     // Fill the score and traceback matrices
-    for (int i = 1; i < rows; ++i)
+    for (int i = 1; i < scoreMatrixDim; ++i)
     {
-        for (int j = 1; j < cols; ++j)
+        for (int j = 1; j < scoreMatrixDim; ++j)
         {
-            int matchScore = (seqA[i - 1] == seqB[j - 1]) ? match : mismatch;
+            int matchScore = (seqA[i - 1] == seqB[j - 1]) ? params.match : params.mismatch;
             int scoreDiag = scoreMatrix[i - 1][j - 1] + matchScore;
-            int scoreUp = scoreMatrix[i - 1][j] + gap_penalty;
-            int scoreLeft = scoreMatrix[i][j - 1] + gap_penalty;
+            int scoreUp = scoreMatrix[i - 1][j] + params.gap;
+            int scoreLeft = scoreMatrix[i][j - 1] + params.gap;
 
             // Calculate the maximum score
             scoreMatrix[i][j] = std::max(0, std::max(scoreDiag, std::max(scoreUp, scoreLeft)));
@@ -104,29 +103,6 @@ void printScoreMatrix(const std::vector<std::vector<int>> &scoreMatrix, const st
         for (int j = 0; j < scoreMatrix[0].size(); ++j)
         {
             std::cout << scoreMatrix[i][j] << "  ";
-        }
-        std::cout << "\n";
-    }
-}
-
-// Print the traceback path
-void printTracebackPath(const std::vector<std::vector<int>> &traceback, const std::string &seqA, const std::string &seqB)
-{
-    std::cout << "Traceback Path:\n  ";
-    for (char b : seqB)
-    {
-        std::cout << "  " << b;
-    }
-    std::cout << "\n";
-    for (int i = 0; i < traceback.size(); ++i)
-    {
-        if (i > 0)
-            std::cout << seqA[i - 1] << " ";
-        else
-            std::cout << "  ";
-        for (int j = 0; j < traceback[0].size(); ++j)
-        {
-            std::cout << traceback[i][j] << "  ";
         }
         std::cout << "\n";
     }
