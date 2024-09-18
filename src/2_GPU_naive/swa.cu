@@ -1,42 +1,44 @@
 #include "swa.hpp"
 
-// Kernel function to compute the score matrix in parallel
+// Kernel functions to compute the score matrix in parallel
 __global__ void smithWatermanKernel_P1(int *scoreMatrix, const char *seqA, const char *seqB, const int antidiagDim, const int scoreMatrixDim, const SWAParams params)
 {
-    int i = threadIdx.x + 1;       // Col index
-    int j = (antidiagDim - i) + 1; // Row index
+    int thread_id = blockIdx.x * blockDim.x + threadIdx.x + 1; // Global thread ID
+    int i = thread_id;                                         // Col index
+    int j = (antidiagDim - i) + 1;                             // Row index
 
-    // Match or mismatch?
-    int matchScore = (seqA[j - 1] == seqB[i - 1]) ? params.match : params.mismatch;
-    int scoreDiag = scoreMatrix[(j - 1) * scoreMatrixDim + (i - 1)] + matchScore;
-    // Gap from North
-    int scoreUp = scoreMatrix[(j - 1) * scoreMatrixDim + i] + params.gap;
-    // Gap from West
-    int scoreLeft = scoreMatrix[j * scoreMatrixDim + (i - 1)] + params.gap;
+    if (i <= antidiagDim && j > 0 && j <= scoreMatrixDim)
+    {
+        // Match or mismatch?
+        int matchScore = (seqA[j - 1] == seqB[i - 1]) ? params.match : params.mismatch;
+        int scoreDiag = scoreMatrix[(j - 1) * scoreMatrixDim + (i - 1)] + matchScore;
+        // Gap from North
+        int scoreUp = scoreMatrix[(j - 1) * scoreMatrixDim + i] + params.gap;
+        // Gap from West
+        int scoreLeft = scoreMatrix[j * scoreMatrixDim + (i - 1)] + params.gap;
 
-    scoreMatrix[j * scoreMatrixDim + i] = max(0, max(scoreDiag, max(scoreUp, scoreLeft)));
-
-    // TEST TO CHECK ANTIDIAGONAL
-    // scoreMatrix[j * scoreMatrixDim + i] = antidiagDim;
+        scoreMatrix[j * scoreMatrixDim + i] = max(0, max(scoreDiag, max(scoreUp, scoreLeft)));
+    }
 }
 
 __global__ void smithWatermanKernel_P2(int *scoreMatrix, const char *seqA, const char *seqB, const int antidiagDim, const int scoreMatrixDim, const SWAParams params)
 {
-    int i = threadIdx.x + 1 + antidiagDim - scoreMatrixDim; // Col index
-    int j = (antidiagDim - i) + 1;                          // Row index
+    int thread_id = blockIdx.x * blockDim.x + threadIdx.x + 1; // Global thread ID
+    int i = thread_id + antidiagDim - scoreMatrixDim;          // Col index
+    int j = (antidiagDim - i) + 1;                             // Row index
 
-    // Match or mismatch?
-    int matchScore = (seqA[j - 1] == seqB[i - 1]) ? params.match : params.mismatch;
-    int scoreDiag = scoreMatrix[(j - 1) * scoreMatrixDim + (i - 1)] + matchScore;
-    // Gap from North
-    int scoreUp = scoreMatrix[(j - 1) * scoreMatrixDim + i] + params.gap;
-    // Gap from West
-    int scoreLeft = scoreMatrix[j * scoreMatrixDim + (i - 1)] + params.gap;
+    if (i > 0 && i <= scoreMatrixDim && j > 0 && j <= scoreMatrixDim)
+    {
+        // Match or mismatch?
+        int matchScore = (seqA[j - 1] == seqB[i - 1]) ? params.match : params.mismatch;
+        int scoreDiag = scoreMatrix[(j - 1) * scoreMatrixDim + (i - 1)] + matchScore;
+        // Gap from North
+        int scoreUp = scoreMatrix[(j - 1) * scoreMatrixDim + i] + params.gap;
+        // Gap from West
+        int scoreLeft = scoreMatrix[j * scoreMatrixDim + (i - 1)] + params.gap;
 
-    scoreMatrix[j * scoreMatrixDim + i] = max(0, max(scoreDiag, max(scoreUp, scoreLeft)));
-
-    // TEST TO CHECK ANTIDIAGONAL
-    // scoreMatrix[j * scoreMatrixDim + i] = antidiagDim;
+        scoreMatrix[j * scoreMatrixDim + i] = max(0, max(scoreDiag, max(scoreUp, scoreLeft)));
+    }
 }
 
 // Host function
@@ -66,20 +68,25 @@ SWAResult smithWaterman(const std::string &seqA, const std::string &seqB, const 
 
     /* ------------------------- Launch the CUDA kernel ------------------------- */
 
-    int ii;
+    int threadsPerBlock = 1024; // Max threads per block for CUDA
+    int blocks, numThreads, ii;
+
     TimePoint start = std::chrono::high_resolution_clock::now();
 
-    // Start from top left corner
+    // Phase 1: From top-left to middle
     for (ii = 1; ii < scoreMatrixDim; ii++)
     {
-        // Move towards the antidiagonal
-        smithWatermanKernel_P1<<<1, ii>>>(d_scoreMatrix, d_seqA, d_seqB, ii, scoreMatrixDim, params);
+        numThreads = min(ii, threadsPerBlock);
+        blocks = (ii + numThreads - 1) / numThreads;
+        smithWatermanKernel_P1<<<blocks, numThreads>>>(d_scoreMatrix, d_seqA, d_seqB, ii, scoreMatrixDim, params);
     }
 
-    // Reach bottom right
+    // Phase 2: From middle to bottom-right
     for (int jj = scoreMatrixDim; jj > 0; jj--)
     {
-        smithWatermanKernel_P2<<<1, jj>>>(d_scoreMatrix, d_seqA, d_seqB, ii, scoreMatrixDim, params);
+        numThreads = min(jj, threadsPerBlock);
+        blocks = (jj + numThreads - 1) / numThreads;
+        smithWatermanKernel_P2<<<blocks, numThreads>>>(d_scoreMatrix, d_seqA, d_seqB, ii, scoreMatrixDim, params);
         ii++;
     }
 
@@ -101,10 +108,10 @@ SWAResult smithWaterman(const std::string &seqA, const std::string &seqB, const 
     TimePoint end = std::chrono::high_resolution_clock::now();
 
     std::chrono::duration<double> elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
-    std::cout << "SW Kernel executed in " << elapsed.count() << " seconds.\n";
+    std::cout << "SW Kernel executed in " << elapsed.count() << " seconds. Cell updates per second (CUPS): " << ((scoreMatrixDim * scoreMatrixDim) / elapsed.count()) << " \n";
 
     // DEBUG
-    // printScoreMatrix(h_scoreMatrix, seqA, seqB);
+    //printScoreMatrix(h_scoreMatrix, seqA, seqB);
 
     /* -------------------------------- Traceback ------------------------------- */
 
@@ -126,7 +133,7 @@ SWAResult smithWaterman(const std::string &seqA, const std::string &seqB, const 
     }
 
     // DEBUG
-    // printf("Max element at: [%d, %d]\n", maxRow, maxCol);
+    //printf("Max element at: [%d, %d]\n", maxRow, maxCol);
 
     std::string alignedSeqA, alignedSeqB;
     int i = maxRow, j = maxCol;
