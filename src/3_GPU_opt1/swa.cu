@@ -74,7 +74,7 @@ SWAResult smithWaterman(const std::string &seqA, const std::string &seqB, const 
 
     /* ------------------------- Launch the CUDA kernel ------------------------- */
 
-    int threadsPerBlock = 32; // Max threads per block for CUDA
+    int threadsPerBlock = 32;
     int blocks, numThreads, ii;
 
     TimePoint start = std::chrono::high_resolution_clock::now();
