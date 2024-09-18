@@ -14,10 +14,10 @@ __global__ void smithWatermanKernel_P1(int *scoreMatrix, const char *seqA, const
     // Gap from West
     int scoreLeft = scoreMatrix[j * scoreMatrixDim + (i - 1)] + params.gap;
 
-    // scoreMatrix[j * cols + i] = max(0, max(scoreDiag, max(scoreUp, scoreLeft)));
+    scoreMatrix[j * scoreMatrixDim + i] = max(0, max(scoreDiag, max(scoreUp, scoreLeft)));
 
     // TEST TO CHECK ANTIDIAGONAL
-    scoreMatrix[j * scoreMatrixDim + i] = j;
+    //scoreMatrix[j * scoreMatrixDim + i] = antidiagDim;
 }
 
 __global__ void smithWatermanKernel_P2(int *scoreMatrix, const char *seqA, const char *seqB, const int antidiagDim, const int scoreMatrixDim, const SWAParams params)
@@ -33,10 +33,10 @@ __global__ void smithWatermanKernel_P2(int *scoreMatrix, const char *seqA, const
     // Gap from West
     int scoreLeft = scoreMatrix[j * scoreMatrixDim + (i - 1)] + params.gap;
 
-    // scoreMatrix[j * cols + i] = max(0, max(scoreDiag, max(scoreUp, scoreLeft)));
+    scoreMatrix[j * scoreMatrixDim + i] = max(0, max(scoreDiag, max(scoreUp, scoreLeft)));
 
     // TEST TO CHECK ANTIDIAGONAL
-    scoreMatrix[j * scoreMatrixDim + i] = j;
+    //scoreMatrix[j * scoreMatrixDim + i] = antidiagDim;
 }
 
 // Host function
@@ -72,24 +72,18 @@ SWAResult smithWaterman(const std::string &seqA, const std::string &seqB, const 
     TimePoint start = std::chrono::high_resolution_clock::now();
 
     // Start from top left corner
-    for (i = 1; i < scoreMatrixDim + 1; i++)
+    for (i = 1; i < scoreMatrixDim; i++)
     {
         // Move towards the antidiagonal
         smithWatermanKernel_P1<<<1, i>>>(d_scoreMatrix, d_seqA, d_seqB, i, scoreMatrixDim, params);
     }
 
-    // // Continue to other corner
-    // for (int i = shortestEdge; i < longestEdge; i++)
-    // {
-    //     smithWatermanKernel<<<1, shortestEdge - 1>>>(d_scoreMatrix, d_seqA, d_seqB, shortestEdge - 1, i, rows, cols, match, mismatch, gap_penalty);
-    // }
-
     // Reach bottom right
-    // for (int k = scoreMatrixDim - 1; k > 0; k--)
-    // {
-    //     smithWatermanKernel2<<<1, k>>>(d_scoreMatrix, d_seqA, d_seqB, k, cols, params);
-    //     i++;
-    // }
+    for (int k = scoreMatrixDim; k > 0; k--)
+    {
+        smithWatermanKernel_P2<<<1, k>>>(d_scoreMatrix, d_seqA, d_seqB, i, scoreMatrixDim, params);
+        i++;
+    }
 
     // Copy the score matrix back to the host
     cudaMemcpy(h_scoreMatrix.data(), d_scoreMatrix, scoreMatrixSize, cudaMemcpyDeviceToHost);
@@ -126,15 +120,15 @@ SWAResult smithWaterman(const std::string &seqA, const std::string &seqB, const 
     std::chrono::duration<double> elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
     std::cout << "SW Kernel executed in " << elapsed.count() << " seconds.\n";
 
-    printScoreMatrix(h_scoreMatrix, seqA, seqB);
+    //printScoreMatrix(h_scoreMatrix, seqA, seqB);
 
     // Perform traceback on the host
     std::string alignedSeqA, alignedSeqB;
     int r = maxRow, c = maxCol;
-    while (false && r > 0 && c > 0 && h_scoreMatrix[r * scoreMatrixDim + c] != 0)
+    while (r > 0 && c > 0 && h_scoreMatrix[r * scoreMatrixDim + c] != 0)
     {
         int currentScore = h_scoreMatrix[r * scoreMatrixDim + c];
-        std::cout << "TRACEBACK: [" << r << "][" << c << "] - Current Score: " << currentScore << "\n";
+        //std::cout << "TRACEBACK: [" << r << "][" << c << "] - Current Score: " << currentScore << "\n";
         int diagScore = h_scoreMatrix[(r - 1) * scoreMatrixDim + (c - 1)];
         int upScore = h_scoreMatrix[(r - 1) * scoreMatrixDim + c];
         int leftScore = h_scoreMatrix[r * scoreMatrixDim + (c - 1)];
@@ -174,7 +168,7 @@ void printScoreMatrix(const std::vector<int> &scoreMatrix, const std::string &se
     int rows = seqA.size() + 1;
     int cols = seqB.size() + 1;
 
-    std::cout << "Score Matrix:\n   ";
+    std::cout << "Score Matrix:\n\t";
     for (char b : seqB)
     {
         std::cout << "\t" << b;
