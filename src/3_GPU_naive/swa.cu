@@ -99,6 +99,11 @@ SWAResult smithWaterman(const std::string &seqA, const std::string &seqB, const 
         return {"", "", -1};
     }
 
+    TimePoint end = std::chrono::high_resolution_clock::now();
+
+    std::chrono::duration<double> elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
+    std::cout << "SW Kernel executed in " << elapsed.count() << " seconds.\n";
+
     // Find the maximum score and its position in the matrix (traceback)
     int maxScore = 0;
     int maxRow = 0, maxCol = 0;
@@ -115,11 +120,6 @@ SWAResult smithWaterman(const std::string &seqA, const std::string &seqB, const 
         }
     }
 
-    TimePoint end = std::chrono::high_resolution_clock::now();
-
-    std::chrono::duration<double> elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
-    std::cout << "SW Kernel executed in " << elapsed.count() << " seconds.\n";
-
     //printScoreMatrix(h_scoreMatrix, seqA, seqB);
 
     // Perform traceback on the host
@@ -133,7 +133,14 @@ SWAResult smithWaterman(const std::string &seqA, const std::string &seqB, const 
         int upScore = h_scoreMatrix[(r - 1) * scoreMatrixDim + c];
         int leftScore = h_scoreMatrix[r * scoreMatrixDim + (c - 1)];
 
-        if (currentScore == diagScore + ((seqA[r - 1] == seqB[c - 1]) ? params.match : params.mismatch))
+        if (currentScore == diagScore + params.match)
+        {
+            alignedSeqA = seqA[r - 1] + alignedSeqA;
+            alignedSeqB = seqB[c - 1] + alignedSeqB;
+            r--;
+            c--;
+        }
+        else if (currentScore == diagScore + params.mismatch)
         {
             alignedSeqA = seqA[r - 1] + alignedSeqA;
             alignedSeqB = seqB[c - 1] + alignedSeqB;
@@ -146,7 +153,7 @@ SWAResult smithWaterman(const std::string &seqA, const std::string &seqB, const 
             alignedSeqB = '-' + alignedSeqB;
             r--;
         }
-        else if (currentScore == leftScore + params.gap)
+        else
         {
             alignedSeqA = '-' + alignedSeqA;
             alignedSeqB = seqB[c - 1] + alignedSeqB;
