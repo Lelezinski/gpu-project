@@ -17,13 +17,13 @@ __global__ void smithWatermanKernel_P1(int *scoreMatrix, const char *seqA, const
     scoreMatrix[j * scoreMatrixDim + i] = max(0, max(scoreDiag, max(scoreUp, scoreLeft)));
 
     // TEST TO CHECK ANTIDIAGONAL
-    //scoreMatrix[j * scoreMatrixDim + i] = antidiagDim;
+    // scoreMatrix[j * scoreMatrixDim + i] = antidiagDim;
 }
 
 __global__ void smithWatermanKernel_P2(int *scoreMatrix, const char *seqA, const char *seqB, const int antidiagDim, const int scoreMatrixDim, const SWAParams params)
 {
-    int i = threadIdx.x + antidiagDim - scoreMatrixDim; // Col index
-    int j = (antidiagDim - i) + 1;                      // Row index
+    int i = threadIdx.x + 1 + antidiagDim - scoreMatrixDim; // Col index
+    int j = (antidiagDim - i) + 1;                          // Row index
 
     // Match or mismatch?
     int matchScore = (seqA[j - 1] == seqB[i - 1]) ? params.match : params.mismatch;
@@ -36,16 +36,13 @@ __global__ void smithWatermanKernel_P2(int *scoreMatrix, const char *seqA, const
     scoreMatrix[j * scoreMatrixDim + i] = max(0, max(scoreDiag, max(scoreUp, scoreLeft)));
 
     // TEST TO CHECK ANTIDIAGONAL
-    //scoreMatrix[j * scoreMatrixDim + i] = antidiagDim;
+    // scoreMatrix[j * scoreMatrixDim + i] = antidiagDim;
 }
 
 // Host function
 SWAResult smithWaterman(const std::string &seqA, const std::string &seqB, const int seqLen, SWAParams params)
 {
-    int i = 1;
-
-    // Account for first row-col
-    int scoreMatrixDim = seqLen + 1;
+    int scoreMatrixDim = seqLen + 1; // Account for first row-col
     size_t scoreMatrixSize = scoreMatrixDim * scoreMatrixDim * sizeof(int);
 
     // Allocate memory on the host using vector
@@ -69,30 +66,32 @@ SWAResult smithWaterman(const std::string &seqA, const std::string &seqB, const 
 
     /* ------------------------- Launch the CUDA kernel ------------------------- */
 
+    int ii;
     TimePoint start = std::chrono::high_resolution_clock::now();
 
     // Start from top left corner
-    for (i = 1; i < scoreMatrixDim; i++)
+    for (ii = 1; ii < scoreMatrixDim; ii++)
     {
         // Move towards the antidiagonal
-        smithWatermanKernel_P1<<<1, i>>>(d_scoreMatrix, d_seqA, d_seqB, i, scoreMatrixDim, params);
+        smithWatermanKernel_P1<<<1, ii>>>(d_scoreMatrix, d_seqA, d_seqB, ii, scoreMatrixDim, params);
     }
 
     // Reach bottom right
-    for (int k = scoreMatrixDim; k > 0; k--)
+    for (int jj = scoreMatrixDim; jj > 0; jj--)
     {
-        smithWatermanKernel_P2<<<1, k>>>(d_scoreMatrix, d_seqA, d_seqB, i, scoreMatrixDim, params);
-        i++;
+        smithWatermanKernel_P2<<<1, jj>>>(d_scoreMatrix, d_seqA, d_seqB, ii, scoreMatrixDim, params);
+        ii++;
     }
 
     // Copy the score matrix back to the host
     cudaMemcpy(h_scoreMatrix.data(), d_scoreMatrix, scoreMatrixSize, cudaMemcpyDeviceToHost);
 
-    // Check for kernel launch errors
+    // Check for errors
     cudaError_t err = cudaGetLastError();
     if (err != cudaSuccess)
     {
         std::cerr << "CUDA error: " << cudaGetErrorString(err) << std::endl;
+
         cudaFree(d_scoreMatrix);
         cudaFree(d_seqA);
         cudaFree(d_seqB);
@@ -104,9 +103,15 @@ SWAResult smithWaterman(const std::string &seqA, const std::string &seqB, const 
     std::chrono::duration<double> elapsed = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
     std::cout << "SW Kernel executed in " << elapsed.count() << " seconds.\n";
 
-    // Find the maximum score and its position in the matrix (traceback)
+    // DEBUG
+    // printScoreMatrix(h_scoreMatrix, seqA, seqB);
+
+    /* -------------------------------- Traceback ------------------------------- */
+
     int maxScore = 0;
     int maxRow = 0, maxCol = 0;
+
+    // Find highest score value
     for (int i = 1; i < scoreMatrixDim; ++i)
     {
         for (int j = 1; j < scoreMatrixDim; ++j)
@@ -120,44 +125,41 @@ SWAResult smithWaterman(const std::string &seqA, const std::string &seqB, const 
         }
     }
 
-    //printScoreMatrix(h_scoreMatrix, seqA, seqB);
+    // DEBUG
+    // printf("Max element at: [%d, %d]\n", maxRow, maxCol);
 
-    // Perform traceback on the host
     std::string alignedSeqA, alignedSeqB;
-    int r = maxRow, c = maxCol;
-    while (r > 0 && c > 0 && h_scoreMatrix[r * scoreMatrixDim + c] != 0)
-    {
-        int currentScore = h_scoreMatrix[r * scoreMatrixDim + c];
-        //std::cout << "TRACEBACK: [" << r << "][" << c << "] - Current Score: " << currentScore << "\n";
-        int diagScore = h_scoreMatrix[(r - 1) * scoreMatrixDim + (c - 1)];
-        int upScore = h_scoreMatrix[(r - 1) * scoreMatrixDim + c];
-        int leftScore = h_scoreMatrix[r * scoreMatrixDim + (c - 1)];
+    int i = maxRow, j = maxCol;
 
-        if (currentScore == diagScore + params.match)
+    while (i > 0 && j > 0 && h_scoreMatrix[i * scoreMatrixDim + j] != 0)
+    {
+        int currentScore = h_scoreMatrix[i * scoreMatrixDim + j];
+        // std::cout << "TRACEBACK: [" << i << "][" << j << "] - Current Score: " << currentScore << "\n";
+        int diagScore = h_scoreMatrix[(i - 1) * scoreMatrixDim + (j - 1)];
+        int upScore = h_scoreMatrix[(i - 1) * scoreMatrixDim + j];
+        int leftScore = h_scoreMatrix[i * scoreMatrixDim + (j - 1)];
+
+        if (currentScore == diagScore + params.match || currentScore == diagScore + params.mismatch)
         {
-            alignedSeqA = seqA[r - 1] + alignedSeqA;
-            alignedSeqB = seqB[c - 1] + alignedSeqB;
-            r--;
-            c--;
-        }
-        else if (currentScore == diagScore + params.mismatch)
-        {
-            alignedSeqA = seqA[r - 1] + alignedSeqA;
-            alignedSeqB = seqB[c - 1] + alignedSeqB;
-            r--;
-            c--;
+            // Move diagonal
+            alignedSeqA = seqA[i - 1] + alignedSeqA;
+            alignedSeqB = seqB[j - 1] + alignedSeqB;
+            i--;
+            j--;
         }
         else if (currentScore == upScore + params.gap)
         {
-            alignedSeqA = seqA[r - 1] + alignedSeqA;
+            // Move up
+            alignedSeqA = seqA[i - 1] + alignedSeqA;
             alignedSeqB = '-' + alignedSeqB;
-            r--;
+            i--;
         }
         else
         {
+            // Move left
             alignedSeqA = '-' + alignedSeqA;
-            alignedSeqB = seqB[c - 1] + alignedSeqB;
-            c--;
+            alignedSeqB = seqB[j - 1] + alignedSeqB;
+            j--;
         }
     }
 
